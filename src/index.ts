@@ -1,4 +1,4 @@
-import { type Ad, Client, Sort } from "lbc/src/index.ts";
+import { type Ad, Client, Sort } from "@maeldonnart/lbc-ts";
 import { SEARCH, SEEN_ADS_FILE } from "./constant.js";
 import { getTelegramConfig } from "./env.js";
 import { readSeenIds, saveSeenIds } from "./store.js";

@@ -12,7 +12,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"lbc": "file:../lbc-ts"
+		"@maeldonnart/lbc-ts": "0.1.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.4",
