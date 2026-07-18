@@ -1,0 +1,51 @@
+import { Client, Sort, type Ad } from "lbc/src/index.ts";
+import { SEARCH, SEEN_ADS_FILE } from "./constant.js";
+import { getTelegramConfig } from "./env.js";
+import { readSeenIds, saveSeenIds } from "./store.js";
+import { sendTelegramMessage } from "./telegram.js";
+
+const telegram = getTelegramConfig();
+const client = new Client({ maxRetries: 1 });
+const seenIds = await readSeenIds(SEEN_ADS_FILE);
+let isFirstSearch = true;
+let running = false;
+
+async function search(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    const result = await client.search({ text: SEARCH.query, sort: Sort.NEWEST, limit: SEARCH.limit });
+    const newAds = result.ads.filter((ad) => ad.id !== undefined && !seenIds.has(ad.id));
+    if (isFirstSearch && !SEARCH.notifyInitialResults) {
+      newAds.forEach((ad) => seenIds.add(ad.id!));
+      await saveSeenIds(SEEN_ADS_FILE, seenIds);
+      console.log(`[${new Date().toISOString()}] ${newAds.length} existing ads saved.`);
+      return;
+    }
+    if (!newAds.length) return console.log(`[${new Date().toISOString()}] No new ads.`);
+    for (const ad of newAds.reverse()) {
+      await sendTelegramMessage(telegram, formatAd(ad));
+      seenIds.add(ad.id!);
+    }
+    await saveSeenIds(SEEN_ADS_FILE, seenIds);
+    console.log(`[${new Date().toISOString()}] ${newAds.length} new ad(s) notified.`);
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}]`, error);
+  } finally {
+    isFirstSearch = false;
+    running = false;
+  }
+}
+
+function formatAd(ad: Ad): string {
+  return [ad.subject ?? "New ad", ad.price === undefined ? undefined : `${ad.price} €`, ad.location.cityLabel, ad.url].filter(Boolean).join("\n");
+}
+
+console.log(`Watching "${SEARCH.query}" every ${SEARCH.intervalMs / 1_000}s.`);
+await search();
+const interval = setInterval(search, SEARCH.intervalMs);
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, () => {
+  clearInterval(interval);
+  console.log("Stopping.");
+  process.exit(0);
+});
