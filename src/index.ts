@@ -16,12 +16,16 @@ async function search(): Promise<void> {
 	try {
 		const result = await client.search({
 			text: SEARCH.query,
+			category: SEARCH.category,
+			price: [SEARCH.priceMin, SEARCH.priceMax],
 			sort: Sort.NEWEST,
 			limit: SEARCH.limit,
 		});
 		const newAds = result.ads.filter(
 			(ad): ad is Ad & { id: number } =>
-				ad.id !== undefined && !seenIds.has(ad.id),
+				ad.id !== undefined &&
+				!seenIds.has(ad.id) &&
+				(!SEARCH.excludeReserved || !isReservedOrSold(ad)),
 		);
 		if (isFirstSearch && !SEARCH.notifyInitialResults) {
 			newAds.forEach((ad) => {
@@ -60,6 +64,12 @@ function formatAd(ad: Ad): string {
 	]
 		.filter(Boolean)
 		.join("\n");
+}
+
+/** Annonce vendue ou en cours de vente (attribut Leboncoin `transaction_status`). */
+function isReservedOrSold(ad: Ad): boolean {
+	const status = ad.attributes?.transaction_status?.valueLabel;
+	return status === "Vendu" || status === "Achat en cours";
 }
 
 console.log(`Watching "${SEARCH.query}" every ${SEARCH.intervalMs / 1_000}s.`);
