@@ -3,6 +3,9 @@ node_modules
 data/seen-ads.json
 .env
 
+# Claude Code local config
+.claude
+
 # output
 out
 dist

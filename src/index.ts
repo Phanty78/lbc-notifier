@@ -1,12 +1,15 @@
 import { type Ad, Client, Sort } from "@maeldonnart/lbc-ts";
-import { SEARCH, SEEN_ADS_FILE } from "./constant.js";
+import { SEARCH } from "./constant.js";
 import { getTelegramConfig } from "./env.js";
-import { readSeenIds, saveSeenIds } from "./store.js";
+import { createStore } from "./store.js";
 import { sendTelegramMessage } from "./telegram.js";
 
 const telegram = getTelegramConfig();
 const client = new Client({ maxRetries: 1 });
-const seenIds = await readSeenIds(SEEN_ADS_FILE);
+const store = createStore();
+const seenIds = await store.load();
+// Ids ajoutés au Set depuis le dernier `store.add` : persistés incrémentalement.
+const newSeen: number[] = [];
 let isFirstSearch = true;
 let running = false;
 
@@ -28,10 +31,12 @@ async function search(): Promise<void> {
 				(!SEARCH.excludeReserved || !isReservedOrSold(ad)),
 		);
 		if (isFirstSearch && !SEARCH.notifyInitialResults) {
-			newAds.forEach((ad) => {
+			for (const ad of newAds) {
 				seenIds.add(ad.id);
-			});
-			await saveSeenIds(SEEN_ADS_FILE, seenIds);
+				newSeen.push(ad.id);
+			}
+			await store.add(newSeen);
+			newSeen.length = 0;
 			console.log(
 				`[${new Date().toISOString()}] ${newAds.length} existing ads saved.`,
 			);
@@ -42,8 +47,10 @@ async function search(): Promise<void> {
 		for (const ad of newAds.reverse()) {
 			await sendTelegramMessage(telegram, formatAd(ad));
 			seenIds.add(ad.id);
+			newSeen.push(ad.id);
 		}
-		await saveSeenIds(SEEN_ADS_FILE, seenIds);
+		await store.add(newSeen);
+		newSeen.length = 0;
 		console.log(
 			`[${new Date().toISOString()}] ${newAds.length} new ad(s) notified.`,
 		);

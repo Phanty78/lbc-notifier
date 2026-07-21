@@ -1,21 +1,40 @@
-import { mkdir } from "node:fs/promises";
-import { dirname } from "node:path";
+import postgres from "postgres";
+import { getDatabaseUrl } from "./env.js";
 
-interface SeenAds {
-	ids: number[];
+/** Store des annonces déjà vues. Agnostique du backend côté `index.ts`. */
+export interface SeenAdsStore {
+	load(): Promise<Set<number>>;
+	/** Insère les ids nouveaux (idempotent : conflits ignorés). */
+	add(ids: number[]): Promise<void>;
 }
 
-export async function readSeenIds(path: string): Promise<Set<number>> {
-	const file = Bun.file(path);
-	if (!(await file.exists())) return new Set();
-	const data = (await file.json()) as SeenAds;
-	return new Set(data.ids);
+interface SeenAdsRow {
+	id: number;
 }
 
-export async function saveSeenIds(
-	path: string,
-	ids: Set<number>,
-): Promise<void> {
-	await mkdir(dirname(path), { recursive: true });
-	await Bun.write(path, JSON.stringify({ ids: [...ids] } satisfies SeenAds));
+/** Store Postgres direct : table `seen_ads(id bigint PK, first_seen_at timestamptz)`. */
+class PostgresStore implements SeenAdsStore {
+	private readonly sql;
+
+	constructor() {
+		// Connexion directe (user postgres = superuser, bypass RLS).
+		this.sql = postgres(getDatabaseUrl());
+	}
+
+	async load(): Promise<Set<number>> {
+		const rows = await this.sql<SeenAdsRow[]>`select id from seen_ads`;
+		return new Set(rows.map((row) => row.id));
+	}
+
+	async add(ids: number[]): Promise<void> {
+		if (!ids.length) return;
+		const rows = ids.map((id) => ({ id }));
+		await this.sql`insert into seen_ads ${this.sql(
+			rows,
+		)} on conflict (id) do nothing`;
+	}
+}
+
+export function createStore(): SeenAdsStore {
+	return new PostgresStore();
 }

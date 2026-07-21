@@ -8,12 +8,29 @@ Surveille les nouvelles annonces Leboncoin correspondant à une recherche et les
 cp .env.example .env
 ```
 
-Renseignez le jeton du bot et l’identifiant du chat dans `.env` :
+Renseignez les variables dans `.env` :
 
 | Variable | Description |
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | Jeton du bot Telegram (via [@BotFather](https://t.me/BotFather)) |
 | `TELEGRAM_CHAT_ID` | Identifiant du chat/destinataire des notifications |
+| `DATABASE_URL` | Connection string Postgres Supabase (`postgresql://postgres:[PASSWORD]@db.<project>.supabase.co:5432/postgres`) |
+
+### Setup Supabase (gratuit)
+
+Les annonces déjà vues sont stockées dans Postgres (Supabase free tier) plutôt que sur disque, ce qui rend le service stateless et déployable sur n’importe quel host (PaaS gratis inclus, FS éphémère OK).
+
+1. Créez un projet sur [supabase.com](https://supabase.com) (free tier).
+2. Dans le **SQL editor**, exécutez [`supabase/schema.sql`](supabase/schema.sql) :
+   ```sql
+   create table if not exists public.seen_ads (
+     id bigint primary key,
+     first_seen_at timestamptz not null default now()
+   );
+   ```
+3. Récupérez la **connection string** dans *Project Settings → Database → Connection string → URI*. Remplacez `[YOUR-PASSWORD]` par le mot de passe base de données (si oublié : *Reset database password* dans la même page). Les caractères spéciaux du mot de passe doivent être percent-encodés dans l’URL.
+
+> Connexion directe (user `postgres` = superuser) : bypass RLS, le service est le seul à y accéder. Ne committez jamais le mot de passe.
 
 ## Exécution
 
@@ -22,7 +39,7 @@ bun install
 bun start
 ```
 
-Le fichier `data/seen-ads.json` conserve les annonces déjà traitées.
+Les annonces déjà traitées sont conservées dans la table Supabase `seen_ads`.
 
 ## Réglages de recherche
 

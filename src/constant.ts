@@ -11,5 +11,3 @@ export const SEARCH = {
 	limit: 100,
 	notifyInitialResults: false,
 } as const;
-
-export const SEEN_ADS_FILE = "data/seen-ads.json";

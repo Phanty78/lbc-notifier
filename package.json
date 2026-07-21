@@ -12,7 +12,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@maeldonnart/lbc-ts": "0.1.0"
+		"@maeldonnart/lbc-ts": "0.1.0",
+		"postgres": "^3.4.5"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.4",
